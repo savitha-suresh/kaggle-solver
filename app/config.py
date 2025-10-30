@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     s3_access_key_id: str = os.getenv("S3_ACCESS_KEY_ID", "")
     s3_secret_access_key: str = os.getenv("S3_SECRET_ACCESS_KEY", "")
 
+    # Model Names
+    openai_model_name: str = os.getenv("OPENAI_MODEL_NAME", "gpt-4-turbo")
+    gemini_model_name: str = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
+
 
 # Create a single settings instance to be used across the application
 settings = Settings()

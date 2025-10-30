@@ -14,7 +14,7 @@ from markdownify import markdownify
 from cache import AsyncLRU
 
 from app.config import settings
-from app.utils import is_valid_kaggle_url
+from app.utils import is_valid_kaggle_url, async_unzip
 
 
 logger = logging.getLogger(__name__)
@@ -176,8 +176,7 @@ async def setup_kaggle_api(job_id: str, competition_url: str) -> tuple[str, str]
             for item in os.listdir(data_path):
                 if item.endswith(".zip"):
                     zip_path = os.path.join(data_path, item)
-                    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                        zip_ref.extractall(data_path)
+                    await async_unzip(zip_path, data_path)
                     os.remove(zip_path)
                     logger.info(f"[{job_id}] Unzipped and removed {item}")
 

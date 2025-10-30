@@ -7,7 +7,7 @@ import asyncio
 from docker.types import Mount
 
 from app.config import settings
-from app.utils import sanitize_job_id
+from app.utils import sanitize_job_id, async_write_file, async_read_file
 
 logger = logging.getLogger(__name__)
 
@@ -36,12 +36,10 @@ async def start_container(job_id: str, code: str, data_dir: str) -> str:
     dockerfile_path = os.path.join(tmpdir, "Dockerfile")
 
     # Write the generated code and Dockerfile to the temp directory
-    with open(script_path, "w") as f:
-        f.write(code)
+    await async_write_file(script_path, code)
     
-    with open("app/worker/Dockerfile.template", "r") as f_template:
-        with open(dockerfile_path, "w") as f_dockerfile:
-            f_dockerfile.write(f_template.read())
+    dockerfile_template = await async_read_file("app/worker/Dockerfile.template")
+    await async_write_file(dockerfile_path, dockerfile_template)
 
     image_tag = f"kaggle-solver-job:{sanitized_job_id}"
     container_name = f"job-container-{sanitized_job_id}"

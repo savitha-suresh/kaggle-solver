@@ -123,10 +123,10 @@ async def poll_container_status(
 
     if status == "running":
         logger.info(f"[{job_id}] Container {container_id} still running. Re-queueing poll task.")
-        # Re-queue with a delay
-        await (poll_container_status.kicker()
-               .with_labels(delay=settings.poll_delay_seconds)
-               .kiq(job_id, container_id))
+       
+        # https://github.com/taskiq-python/taskiq/issues/279
+        await asyncio.sleep(settings.poll_delay_seconds)
+        await poll_container_status.kiq(job_id, container_id)
         
     elif status == "exited_success":
         logger.info(f"[{job_id}] Container {container_id} exited successfully.")

@@ -12,7 +12,7 @@ class OpenAILLM(BaseLLM):
         if not api_key:
             raise ValueError("OpenAI API key is required.")
         self.client = AsyncOpenAI(api_key=api_key)
-        self.model = "gpt-4-turbo" # Or another suitable model
+        self.model = settings.openai_model_name
         logger.info("OpenAI LLM client initialized.")
 
     async def generate_code(

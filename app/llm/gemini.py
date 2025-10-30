@@ -12,7 +12,7 @@ class GeminiLLM(BaseLLM):
         if not api_key:
             raise ValueError("Gemini API key is required.")
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        self.model = genai.GenerativeModel(settings.gemini_model_name)
         logger.info("Gemini LLM client initialized.")
 
     async def generate_code(
