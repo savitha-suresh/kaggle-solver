@@ -1,0 +1,19 @@
+# This is a template. The worker will copy this and use it.
+FROM python:3.10-slim
+
+# Install common data science libraries
+# In a real system, you might want a more minimal set based on the competition
+RUN pip install pandas scikit-learn numpy stable-baselines3
+
+# Set up the working directory
+WORKDIR /app
+
+# The worker will mount volumes for input and output
+# /kaggle/input (read-only) - for competition data
+# /kaggle/working (read-write) - for the output submission.csv
+
+# Copy the generated script into the container
+COPY generated_script.py .
+
+# Run the script
+CMD ["python", "generated_script.py"]
