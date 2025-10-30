@@ -98,6 +98,7 @@ async def submit_job(request: Request, url: str, redis_client: redis.Redis = Dep
         "container_id": None, # New field for container ID
         "created_at": datetime.utcnow().isoformat(),
         "processed_at": None,
+        "completed_at": None,
     }
 
     try:

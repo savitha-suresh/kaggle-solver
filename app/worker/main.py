@@ -138,6 +138,7 @@ async def poll_container_status(
             
             await redis_client.json().set(job_id, "$.status", "completed")
             await redis_client.json().set(job_id, "$.submission_path", final_path)
+            await redis_client.json().set(job_id, "$.completed_at", datetime.utcnow().isoformat())
             logger.info(f"[{job_id}] Job completed successfully. Submission saved to {final_path}")
         except Exception as e:
             logger.error(f"[{job_id}] Error saving submission file: {e}", exc_info=True)
@@ -164,6 +165,7 @@ async def handle_job_failure(job_id: str, error_message: str, logs: str | None, 
 
     if current_attempts + 1 >= max_attempts:
         await redis_client.json().set(job_id, "$.status", "failed")
+        await redis_client.json().set(job_id, "$.completed_at", datetime.utcnow().isoformat())
         logger.error(f"[{job_id}] Job failed permanently after {current_attempts + 1} attempts.")
     else:
         await redis_client.json().set(job_id, "$.attempts", current_attempts + 1)
