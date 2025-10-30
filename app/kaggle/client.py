@@ -14,6 +14,7 @@ from markdownify import markdownify
 from cache import AsyncLRU
 
 from app.config import settings
+from app.utils import is_valid_kaggle_url
 
 
 logger = logging.getLogger(__name__)
@@ -30,12 +31,6 @@ async def get_kaggle_api() -> KaggleApi:
         await asyncio.to_thread(_kaggle_api.authenticate)
         logger.info("Kaggle API authenticated successfully")
     return _kaggle_api
-
-
-def is_valid_kaggle_url(url: str) -> bool:
-    """Validates if the URL is a Kaggle competition URL."""
-    pattern = r"^https?://(www\.)?kaggle\.com/(c|competitions)/[a-zA-Z0-9_-]+/?$"
-    return re.match(pattern, url) is not None
 
 
 def extract_competition_id(url: str) -> str:
@@ -100,7 +95,7 @@ async def scrape_competition_details(competition_id: str) -> dict:
                     "div[data-testid='competition-detail-render-tid'] div.sc-iRTMaw.buAyFc")
                 )
             )
-            
+
             challenge_data_details = child_div.get_attribute("innerHTML")
             
             return {

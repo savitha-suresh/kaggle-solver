@@ -60,7 +60,9 @@ class OpenAILLM(BaseLLM):
                          "The script must read data from a directory named '/kaggle/input', process it, train a model, make predictions, "
                          "and write the submission file to '/kaggle/working/submission.csv' in the specified format. "
                          "Provide only the complete, runnable Python script without any explanatory text and without bugs. I am using python 3.10:slim image"
-                         " and pandas scikit-learn numpy stable-baselines3 libraies, so write code using only these libraries.")
+                         " and pandas scikit-learn numpy stable-baselines3 libraies, so write code using only these libraries."
+                         "All the data files are within the '/kaggle/input' directory" 
+                        "and not nested within further subdirectories with competition id.")
 
         user_prompt = f"""Here are the competition details and data description:
         --- COMPETITION INSTRUCTIONS ---

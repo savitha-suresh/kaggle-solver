@@ -20,6 +20,7 @@ from .logging_config import setup_logging
 from app.schemas.status import StatusResponse
 # Import the Taskiq task
 from app.worker.main import process_job
+from app.utils import is_valid_kaggle_url
 
 # --- Setup ---
 setup_logging()
@@ -75,10 +76,7 @@ async def get_redis() -> redis.Redis:
     return app.state.redis
 
 # --- Helper Functions ---
-def is_valid_kaggle_url(url: str) -> bool:
-    """Validates if the URL is a Kaggle competition URL."""
-    pattern = r"^https?://(www\.)?kaggle\.com/(c|competitions)/[a-zA-Z0-9_-]+/?$"
-    return re.match(pattern, url) is not None
+
 
 # --- API Endpoints ---
 @app.post("/run")

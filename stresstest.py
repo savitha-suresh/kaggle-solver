@@ -16,7 +16,7 @@ async def make_request(client: httpx.AsyncClient, user_id: int):
     params = {"url": KAGGLE_URL}
     try:
         print(f"[User {user_id}] Sending request to {url}")
-        response = await client.get(url, params=params, timeout=30.0)
+        response = await client.post(url, params=params, timeout=30.0)
 
         if 200 <= response.status_code < 300:
             job_id = response.json().get("job_id")

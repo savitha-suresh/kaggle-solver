@@ -51,7 +51,8 @@ class GeminiLLM(BaseLLM):
         You are an expert Kaggle data scientist. Your task is to write a Python script to solve a Kaggle competition.
         The script must read data from a directory named '/kaggle/input', process it, train a model, make predictions, 
         and write the submission file to '/kaggle/working/submission.csv' in the specified format.
-
+        All the data files are within the '/kaggle/input' directory 
+        and not nested within further subdirectories with competition id.
         Here are the competition details and data description:
         --- COMPETITION INSTRUCTIONS ---
         {competition_instructions}
