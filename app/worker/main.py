@@ -17,6 +17,9 @@ from app.storage.factory import storage_factory
 from app.worker.docker_utils import start_container, get_container_status_and_logs
 from app.kaggle.client import setup_kaggle_api
 from app.utils import sanitize_job_id
+from app.worker.dependencies import get_llm_client, get_redis_client, get_storage_client
+from app.llm.base import BaseLLM
+from app.storage.base import BaseStorage
 
 
 # --- Setup ---
@@ -33,21 +36,16 @@ broker = ListQueueBroker(
 ).with_result_backend(result_backend)
 
 
-async def get_redis_client() -> redis.Redis:
-    """Get Redis client instance."""
-    return redis.Redis(
-        host=settings.redis_host,
-        port=settings.redis_port,
-        db=settings.redis_db,
-        decode_responses=True
-    )
+
 
 
 # --- Taskiq Tasks ---
 @broker.task(task_name="process_job_queue")
 async def process_job(
     job_id: str,
-    redis_client: redis.Redis = TaskiqDepends(get_redis_client)
+    redis_client: redis.Redis = TaskiqDepends(get_redis_client),
+    llm: BaseLLM = TaskiqDepends(get_llm_client),
+    storage: BaseStorage = TaskiqDepends(get_storage_client)
 ):
     """Taskiq task to process a Kaggle competition job."""
     logger.info(f"[{job_id}] Taskiq task 'process_job' started.")
@@ -70,7 +68,6 @@ async def process_job(
         previous_code = None
         error_feedback = None
         if job_data.get('attempts', 0) > 0 and job_data.get('generated_code_path'):
-            storage = storage_factory.get_storage()
             try:
                 previous_code_bytes = await storage.read_file(job_data['generated_code_path'])
                 previous_code = previous_code_bytes.decode('utf-8')
@@ -80,7 +77,7 @@ async def process_job(
                 logger.warning(f"[{job_id}] Could not read previous code/errors for retry: {e}")
 
         # 4. Generate code
-        llm = llm_factory.get_llm()
+        logger.info(f"[{job_id}] Requesting code generation from LLM.")
         generated_code = await llm.generate_code(
             competition_instructions=llm_instructions,
             previous_code=previous_code,
@@ -88,7 +85,6 @@ async def process_job(
         )
         
         # 5. Save the generated code
-        storage = storage_factory.get_storage()
         code_file_path = os.path.join(sanitize_job_id(job_id), "generated_script.py")
         saved_code_path = await storage.save_file(code_file_path, generated_code)
         await redis_client.json().set(job_id, "$.generated_code_path", saved_code_path)
@@ -110,7 +106,8 @@ async def process_job(
 async def poll_container_status(
     job_id: str,
     container_id: str,
-    redis_client: redis.Redis = TaskiqDepends(get_redis_client)
+    redis_client: redis.Redis = TaskiqDepends(get_redis_client),
+    storage: BaseStorage = TaskiqDepends(get_storage_client)
 ):
     """Taskiq task to poll the status of a Docker container."""
     logger.info(f"[{job_id}] Taskiq task 'poll_container_status' started for container {container_id}.")
@@ -131,7 +128,6 @@ async def poll_container_status(
     elif status == "exited_success":
         logger.info(f"[{job_id}] Container {container_id} exited successfully.")
         try:
-            storage = storage_factory.get_storage()
             # Read submission file content from the persistent path
             # Standard open is blocking, run in a thread pool
             submission_content = await asyncio.to_thread(lambda: open(submission_file_path, 'rb').read())

@@ -21,6 +21,7 @@ from app.schemas.status import StatusResponse
 # Import the Taskiq task
 from app.worker.main import process_job
 from app.utils import is_valid_kaggle_url
+from app.redis import get_redis_connection_kwargs
 
 # --- Setup ---
 setup_logging()
@@ -52,12 +53,7 @@ taskiq_fastapi.init(broker, "app.worker.main:broker")
 async def startup_event():
     """Initializes async Redis connection pool on app startup."""
     try:
-        app.state.redis = redis.Redis(
-            host=settings.redis_host,
-            port=settings.redis_port,
-            db=settings.redis_db,
-            decode_responses=True
-        )
+        app.state.redis = redis.Redis(**get_redis_connection_kwargs())
         await app.state.redis.ping()
         logger.info("Successfully connected to Redis (async client).")
     except Exception as e:
