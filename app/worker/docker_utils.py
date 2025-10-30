@@ -11,6 +11,11 @@ from app.utils import sanitize_job_id, async_write_file, async_read_file
 
 logger = logging.getLogger(__name__)
 
+def _get_image_tag(job_id: str) -> str:
+    """Generates the Docker image tag for a given job ID."""
+    sanitized_job_id = sanitize_job_id(job_id)
+    return f"kaggle-solver-job:{sanitized_job_id}"
+
 
 async def run_in_executor(func, *args, **kwargs):
     """Helper to run blocking Docker SDK calls asynchronously in a thread pool."""
@@ -41,7 +46,7 @@ async def start_container(job_id: str, code: str, data_dir: str) -> str:
     dockerfile_template = await async_read_file("app/worker/Dockerfile.template")
     await async_write_file(dockerfile_path, dockerfile_template)
 
-    image_tag = f"kaggle-solver-job:{sanitized_job_id}"
+    image_tag = _get_image_tag(job_id)
     container_name = f"job-container-{sanitized_job_id}"
 
     # Define the persistent submission output directory
@@ -179,13 +184,13 @@ async def cleanup_container(job_id: str, container_id: str, client: docker.Docke
             await run_in_executor(container.remove, force=True)
             logger.info(f"[{job_id}] Removed container: {container_id}")
             
-            # Optionally remove the image (commented out by default as it can be slow)
-            # image_tag = f"kaggle-solver-job:{job_id}"
-            # try:
-            #     await run_in_executor(client.images.remove, image_tag, force=True)
-            #     logger.info(f"[{job_id}] Removed image: {image_tag}")
-            # except Exception as e:
-            #     logger.warning(f"[{job_id}] Could not remove image {image_tag}: {e}")
+            #Optionally remove the image (commented out by default as it can be slow)
+            image_tag = _get_image_tag(job_id)
+            try:
+                await run_in_executor(client.images.remove, image_tag, force=True)
+                logger.info(f"[{job_id}] Removed image: {image_tag}")
+            except Exception as e:
+                logger.warning(f"[{job_id}] Could not remove image {image_tag}: {e}")
         else:
             logger.info(f"[{job_id}] Container is still running, skipping cleanup")
             

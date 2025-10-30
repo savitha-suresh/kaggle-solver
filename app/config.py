@@ -21,7 +21,7 @@ class Settings(BaseSettings):
 
     # Job Settings
     max_attempts: int = 3
-    poll_delay_seconds: int = 100 # Delay between polling container status
+    poll_delay_seconds: int = 60 # Delay between polling container status
 
 
     # Rate Limiting (requests per minute)

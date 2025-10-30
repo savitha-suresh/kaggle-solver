@@ -8,7 +8,7 @@ import os
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 API_BASE_URL = "http://127.0.0.1:8000"
-POLL_INTERVAL_SECONDS = 100
+POLL_INTERVAL_SECONDS = 60
 DOWNLOAD_DIR = "./downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
