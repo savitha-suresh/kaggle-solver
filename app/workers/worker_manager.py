@@ -1,4 +1,5 @@
-from taskiq_redis import RedisAsyncResultBackend, ListQueueBroker
+from taskiq.abc.broker import AsyncBroker
+
 _WORKERS_DATA = {
     "process_job_queue": {
         "args": ["job_id", "competition_url"],
@@ -15,12 +16,12 @@ _WORKERS_DATA = {
     "job_runner": {
         "args": ["job_id"],
     },
-    "poll_container_status": {
-        "args": ["job_id", "container_id"],
+    "poll_runner_status": {
+        "args": ["job_id", "runner_id"],
     },
 }
 
-def get_worker(broker: ListQueueBroker, task_name: str) -> tuple:
+def get_worker(broker: AsyncBroker, task_name: str) -> tuple:
     task = broker.local_task_registry.get(task_name)
     worker_data = _WORKERS_DATA.get(task_name)
     return task, worker_data

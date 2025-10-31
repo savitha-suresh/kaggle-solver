@@ -12,7 +12,7 @@ from app.storage.base import BaseStorage
 from app.tasks_dag import TASKS_DAG
 from app.utils import sanitize_job_id, async_read_file
 from app.workers.dependencies import get_redis_client, get_storage_client
-from app.workers.docker_utils import get_container_status_and_logs, cleanup_container_force
+from app.workers.runners.factory import RunnerFactory
 from app.workers.broker_config import broker
 from app.workers.code_generator import code_generator
 
@@ -20,17 +20,17 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
-@broker.task(task_name="poll_container_status")
-async def poll_container_status(
+@broker.task(task_name="poll_runner_status")
+async def poll_runner_status(
     job_id: str,
-    container_id: str,
+    runner_id: str,
     context: Context = TaskiqDepends(),
     redis_client: redis.Redis = TaskiqDepends(get_redis_client),
     storage: BaseStorage = TaskiqDepends(get_storage_client),
 ):
-    """Task to poll the status of a Docker container."""
+    """Task to poll the status of a runner."""
     task_name = context.message.task_name
-    logger.info(f"[{job_id}] Task '{task_name}' started for container {container_id}.")
+    logger.info(f"[{job_id}] Task '{task_name}' started for runner {runner_id}.")
     await redis_client.json().set(job_id, "$.current_task", task_name)
 
     job_data = await redis_client.json().get(job_id)
@@ -38,29 +38,30 @@ async def poll_container_status(
         logger.error(f"[{job_id}] Job data not found in Redis during polling.")
         return
 
-    status, logs, submission_file_path = await get_container_status_and_logs(
-        job_id, container_id
+    runner = RunnerFactory.get_runner(settings.runner_provider)
+    status, logs, submission_file_path = await runner.poll_status(
+        job_id, runner_id
     )
 
     if status == "running":
         logger.info(
-            f"[{job_id}] Container {container_id} still running. Re-queueing poll task."
+            f"[{job_id}] Runner {runner_id} still running. Re-queueing poll task."
         )
-        container_created_at = datetime.fromisoformat(job_data["created_at"])
-        if datetime.utcnow() - container_created_at > timedelta(
+        runner_created_at = datetime.fromisoformat(job_data["created_at"])
+        if datetime.utcnow() - runner_created_at > timedelta(
             seconds=settings.task_timeout
         ):
-            logger.error(f"[{job_id}] Container {container_id} timed out.")
+            logger.error(f"[{job_id}] Runner {runner_id} timed out.")
             await handle_job_failure(
-                job_id, "Container execution timed out.", logs, redis_client, is_timeout=True
+                job_id, "Runner execution timed out.", logs, redis_client, is_timeout=True
             )
             return
 
         await asyncio.sleep(settings.poll_delay_seconds)
-        await poll_container_status.kiq(job_id, container_id)
+        await poll_runner_status.kiq(job_id, runner_id)
 
     elif status == "exited_success":
-        logger.info(f"[{job_id}] Container {container_id} exited successfully.")
+        logger.info(f"[{job_id}] Runner {runner_id} exited successfully.")
         try:
             submission_content = await async_read_file(submission_file_path)
 
@@ -83,9 +84,9 @@ async def poll_container_status(
                 job_id, f"Error saving submission: {e}", logs, redis_client
             )
     elif status == "exited_error":
-        logger.error(f"[{job_id}] Container {container_id} exited with an error.")
+        logger.error(f"[{job_id}] Runner {runner_id} exited with an error.")
         await handle_job_failure(
-            job_id, "Container execution failed.", logs, redis_client
+            job_id, "Runner execution failed.", logs, redis_client
         )
 
 
@@ -118,8 +119,9 @@ async def handle_job_failure(
         logger.error(
             f"[{job_id}] Job failed permanently after {current_attempts + 1} attempts."
         )
-        if job_data.get("container_id"):
-            await cleanup_container_force(job_id, job_data["container_id"])
+        if job_data.get("runner_id"):
+            runner = RunnerFactory.get_runner(settings.runner_provider)
+            await runner.force_stop(job_id, job_data["runner_id"])
     else:
         await redis_client.json().set(job_id, "$.attempts", current_attempts + 1)
         await redis_client.json().set(job_id, "$.status", "pending_retry")

@@ -3,6 +3,6 @@ TASKS_DAG = {
     "kaggle_data_loader": ["kaggle_scraper"],
     "kaggle_scraper": ["code_generator"],
     "code_generator": ["job_runner"],
-    "job_runner": ["poll_container_status"],
-    "poll_container_status": [],
+    "job_runner": ["poll_runner_status"],
+    "poll_runner_status": [],
 }

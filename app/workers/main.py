@@ -18,7 +18,7 @@ from .kaggle_data_loader import kaggle_data_loader
 from .kaggle_scraper import kaggle_scraper
 from .code_generator import code_generator
 from .job_runner import job_runner
-from .poll_container_status import poll_container_status
+from .poll_runner_status import poll_runner_status
 
 # --- Setup ---
 setup_logging()

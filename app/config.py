@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     # Factory settings
     llm_provider: str = "gemini"  # or "openai"
     storage_provider: str = "local" # or "s3"
+    broker_provider: str = "redis" # or "rabbitmq"
+    runner_provider: str = "docker" # or "lambda"
 
     # Local storage path
     local_storage_path: str = "/tmp/kaggle_solver"
