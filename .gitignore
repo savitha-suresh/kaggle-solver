@@ -148,3 +148,5 @@ cython_debug/
 *.dat
 data/
 submissions/
+instructions/
+output/

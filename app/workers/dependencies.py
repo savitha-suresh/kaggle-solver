@@ -4,6 +4,7 @@ import redis.asyncio as redis
 from app.redis import get_redis_connection_kwargs
 from app.storage.factory import storage_factory
 from app.storage.base import BaseStorage
+from kaggle.api.kaggle_api_extended import KaggleApi
 
 class LLMClientDependency:
     _instance: BaseLLM | None = None
@@ -40,3 +41,16 @@ class StorageClientDependency:
 
 def get_storage_client() -> BaseStorage:
     return StorageClientDependency.get_client()
+
+class KaggleApiDependency:
+    _instance: object | None = None
+
+    @classmethod
+    def get_client(cls) -> object:
+        if cls._instance is None:
+            cls._instance = KaggleApi()
+            cls._instance.authenticate()
+        return cls._instance
+
+def get_kaggle_api() -> object:
+    return KaggleApiDependency.get_client()

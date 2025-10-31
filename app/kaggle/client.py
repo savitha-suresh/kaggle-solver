@@ -21,20 +21,6 @@ from app.utils import is_valid_kaggle_url, async_unzip
 
 logger = logging.getLogger(__name__)
 
-# Global Kaggle API instance (authenticate once)
-_kaggle_api: KaggleApi | None = None
-
-
-
-async def get_kaggle_api() -> KaggleApi:
-    """Get or initialize the global Kaggle API instance."""
-    global _kaggle_api
-    if _kaggle_api is None:
-        _kaggle_api = KaggleApi()
-        await asyncio.to_thread(_kaggle_api.authenticate)
-        logger.info("Kaggle API authenticated successfully")
-    return _kaggle_api
-
 
 def extract_competition_id(url: str) -> str:
     """Extract competition ID from Kaggle URL."""
@@ -139,7 +125,9 @@ Focus on creating an accurate model that performs well on the evaluation metric 
     return instructions
 
 
-async def setup_kaggle_api(job_id: str, competition_url: str, redis_client: redis.Redis) -> tuple[str, str]:
+async def download_kaggle_data(job_id: str, competition_url: str, 
+                           redis_client: redis.Redis, 
+                           kaggle_api: KaggleApi) -> tuple[str, str]:
     """Setup Kaggle API, download data, and scrape instructions.
     
     Returns:
@@ -150,7 +138,6 @@ async def setup_kaggle_api(job_id: str, competition_url: str, redis_client: redi
         raise ValueError(f"Invalid Kaggle competition URL: {competition_url}")
     
     # Get authenticated API instance (only authenticates once)
-    api = await get_kaggle_api()
     
     # Extract competition ID
     competition_id = extract_competition_id(competition_url)
@@ -170,7 +157,7 @@ async def setup_kaggle_api(job_id: str, competition_url: str, redis_client: redi
             logger.info(f"[{job_id}] Downloading data for '{competition_id}' to {data_path}")
             try:
                 await asyncio.to_thread(
-                    api.competition_download_files, 
+                    kaggle_api.competition_download_files, 
                     competition_id, 
                     path=data_path, 
                     quiet=False
@@ -190,14 +177,5 @@ async def setup_kaggle_api(job_id: str, competition_url: str, redis_client: redi
                 # Create dummy data for testing
         else:
             logger.info(f"[{job_id}] Data for '{competition_id}' already exists at {data_path}. Skipping download.")
-        
-    
-    # Scrape competition details
-    logger.info(f"[{job_id}] Scraping competition instructions...")
-    scraped_data = await scrape_competition_details(competition_id)
-    
-    # Format instructions for LLM
-    llm_instructions = format_instructions_for_llm(scraped_data, competition_id)
-    logger.info(f"[{job_id}] Instructions prepared for LLM agent")
-    
-    return llm_instructions, data_path
+
+    return competition_id, data_path

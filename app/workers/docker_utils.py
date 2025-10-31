@@ -43,7 +43,7 @@ async def start_container(job_id: str, code: str, data_dir: str) -> str:
     # Write the generated code and Dockerfile to the temp directory
     await async_write_file(script_path, code)
     
-    dockerfile_template = await async_read_file("app/worker/Dockerfile.template")
+    dockerfile_template = await async_read_file("app/workers/Dockerfile.template")
     await async_write_file(dockerfile_path, dockerfile_template)
 
     image_tag = _get_image_tag(job_id)

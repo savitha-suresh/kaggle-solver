@@ -21,7 +21,7 @@ def append_url(base_url: str, path: str) -> str:
     return f"{base_url}/{path}"
 
 
-def scrape_competition_details(competition_id: str) -> dict:
+def scrape_competition_details_sync(competition_id: str) -> dict:
     """
     Scrape competition details from Kaggle using Selenium.
     
@@ -111,7 +111,7 @@ def scrape_competition_details(competition_id: str) -> dict:
             driver.quit()
 
 
-def format_instructions_for_llm(scraped_data: dict, competition_id: str) -> str:
+def format_instructions_for_llm_sync(scraped_data: dict, competition_id: str) -> str:
     """Format scraped data into instructions for LLM agent."""
     instructions = f"""You are solving the Kaggle competition: {competition_id}
 
@@ -148,7 +148,7 @@ def save_to_files(scraped_data: dict, competition_id: str, output_dir: str = "./
         print(f"Saved: {filepath}")
     
     # Also save the formatted instructions
-    instructions = format_instructions_for_llm(scraped_data, competition_id)
+    instructions = format_instructions_for_llm_sync(scraped_data, competition_id)
     instructions_path = os.path.join(output_dir, f"{competition_id}_instructions.md")
     with open(instructions_path, "w", encoding="utf-8") as f:
         f.write(instructions)
@@ -169,7 +169,7 @@ def main():
     
     try:
         # Scrape the competition
-        scraped_data = scrape_competition_details(competition_id)
+        scraped_data = scrape_competition_details_sync(competition_id)
         
         # Save to files
         save_to_files(scraped_data, competition_id)

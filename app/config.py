@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     local_storage_path: str = "/tmp/kaggle_solver"
     submissions_base_path: str = "./app/submissions"
     competition_data_base_path: str = "./app/data"
+    instructions_dir: str = "./app/instructions"
+    scrape_lock_timeout: int = 300
 
     # S3 Storage Settings
     s3_bucket: str = os.getenv("S3_BUCKET", "")

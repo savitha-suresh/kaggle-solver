@@ -18,8 +18,7 @@ from taskiq_redis import RedisAsyncResultBackend, ListQueueBroker
 from .config import settings
 from .logging_config import setup_logging
 from app.schemas.status import StatusResponse
-# Import the Taskiq task
-from app.worker.main import process_job
+from app.workers.main import process_job
 from app.utils import is_valid_kaggle_url
 from app.redis import get_redis_connection_kwargs
 
@@ -90,6 +89,7 @@ async def submit_job(request: Request, url: str, redis_client: redis.Redis = Dep
         "id": job_id,
         "status": "pending",
         "competition_url": url,
+        "current_task": None,
         "attempts": 0,
         "max_attempts": settings.max_attempts,
         "errors": [],
@@ -98,14 +98,14 @@ async def submit_job(request: Request, url: str, redis_client: redis.Redis = Dep
         "container_id": None, # New field for container ID
         "created_at": datetime.utcnow().isoformat(),
         "processed_at": None,
-        "completed_at": None,
+        "completed_at": None
     }
 
     try:
         # Use redis-py's native JSON commands
         await redis_client.json().set(job_id, "$", job_data)
         # Enqueue the Taskiq task
-        await process_job.kiq(job_id)
+        await process_job.kiq(job_id, url)
         logger.info(f"Successfully enqueued Taskiq job {job_id} for URL: {url}")
     except Exception as e:
         logger.error(f"Failed to enqueue Taskiq job {job_id}: {e}", exc_info=True)
