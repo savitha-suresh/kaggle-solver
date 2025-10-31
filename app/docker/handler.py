@@ -7,7 +7,7 @@ import asyncio
 from docker.types import Mount
 
 from app.config import settings
-from app.utils import sanitize_job_id, async_write_file, async_read_file
+from app.utils.misc import sanitize_job_id, async_write_file, async_read_file
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ async def start_container(job_id: str, code: str, data_dir: str) -> str:
     # Write the generated code and Dockerfile to the temp directory
     await async_write_file(script_path, code)
     
-    dockerfile_template = await async_read_file("app/workers/Dockerfile.template")
+    dockerfile_template = await async_read_file("app/docker/Dockerfile.template")
     await async_write_file(dockerfile_path, dockerfile_template)
 
     image_tag = _get_image_tag(job_id)

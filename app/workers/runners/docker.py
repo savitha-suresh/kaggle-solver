@@ -1,5 +1,5 @@
 from app.workers.runners.base import Runner
-from app.workers.docker_utils import start_container, get_container_status_and_logs, cleanup_container_force
+from app.docker.handler import start_container, get_container_status_and_logs, cleanup_container_force
 
 class DockerRunner(Runner):
     async def submit_job(self, job_id: str, code: str, data_dir: str) -> str:

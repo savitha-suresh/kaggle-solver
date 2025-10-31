@@ -19,7 +19,7 @@ from .config import settings
 from .logging_config import setup_logging
 from app.schemas.status import StatusResponse
 from app.workers.main import process_job
-from app.utils import is_valid_kaggle_url
+from app.utils.misc import is_valid_kaggle_url
 from app.redis import get_redis_connection_kwargs
 
 # --- Setup ---

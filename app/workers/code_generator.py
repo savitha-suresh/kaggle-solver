@@ -10,7 +10,7 @@ from app.llm.base import BaseLLM
 from app.logging_config import setup_logging
 from app.storage.base import BaseStorage
 from app.tasks_dag import TASKS_DAG
-from app.utils import sanitize_job_id, async_read_file
+from app.utils.misc import sanitize_job_id, async_read_file
 from app.workers.dependencies import get_llm_client, get_redis_client, get_storage_client
 from app.workers.worker_manager import get_worker
 from app.workers.broker_config import broker

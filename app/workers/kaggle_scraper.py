@@ -14,7 +14,7 @@ from app.tasks_dag import TASKS_DAG
 from app.workers.dependencies import get_redis_client, get_kaggle_api
 from app.workers.worker_manager import get_worker
 from app.workers.broker_config import broker
-from app.utils import async_write_file
+from app.utils.misc import async_write_file
 
 setup_logging()
 logger = logging.getLogger(__name__)

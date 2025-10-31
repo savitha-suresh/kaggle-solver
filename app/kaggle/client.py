@@ -16,7 +16,7 @@ from markdownify import markdownify
 from cache import AsyncLRU
 
 from app.config import settings
-from app.utils import is_valid_kaggle_url, async_unzip
+from app.utils.misc import is_valid_kaggle_url, async_unzip
 
 
 logger = logging.getLogger(__name__)
