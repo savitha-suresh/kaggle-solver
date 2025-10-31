@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     # Job Settings
     max_attempts: int = 3
     poll_delay_seconds: int = 60 # Delay between polling container status
+    task_timeout: int = 1800 # Timeout for a task in seconds
 
 
     # Rate Limiting (requests per minute)
@@ -45,6 +46,14 @@ class Settings(BaseSettings):
     # Model Names
     openai_model_name: str = os.getenv("OPENAI_MODEL_NAME", "gpt-4-turbo")
     gemini_model_name: str = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
+
+    # Docker settings
+    docker_cpu_limit: str = "1"
+    docker_memory_limit: str = "4g"
+
+    # Timeouts
+    gemini_timeout: int = 300
+    openai_timeout: int = 300
 
 
 # Create a single settings instance to be used across the application

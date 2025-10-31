@@ -34,6 +34,7 @@ class OpenAILLM(BaseLLM):
                     {"role": "user", "content": user_prompt},
                 ],
                 temperature=0.2, # Lower temperature for more deterministic code
+                timeout=settings.openai_timeout,
             )
             generated_code = response.choices[0].message.content
             # Basic cleaning to remove markdown code fences

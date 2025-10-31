@@ -26,7 +26,10 @@ class GeminiLLM(BaseLLM):
 
         try:
             # The google-generativeai library's generate_content is awaitable
-            response = await self.model.generate_content_async(prompt)
+            response = await self.model.generate_content_async(
+                prompt,
+                request_options={"timeout": settings.gemini_timeout}
+            )
             generated_code = response.text
             # Basic cleaning to remove markdown code fences
             if generated_code.startswith("```python"):

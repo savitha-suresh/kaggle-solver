@@ -3,6 +3,8 @@ import logging
 import re
 import asyncio
 import zipfile
+import redis.asyncio as redis
+from redis.asyncio.lock import Lock
 
 from kaggle.api.kaggle_api_extended import KaggleApi
 from selenium import webdriver
@@ -21,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 # Global Kaggle API instance (authenticate once)
 _kaggle_api: KaggleApi | None = None
+
 
 
 async def get_kaggle_api() -> KaggleApi:
@@ -136,7 +139,7 @@ Focus on creating an accurate model that performs well on the evaluation metric 
     return instructions
 
 
-async def setup_kaggle_api(job_id: str, competition_url: str) -> tuple[str, str]:
+async def setup_kaggle_api(job_id: str, competition_url: str, redis_client: redis.Redis) -> tuple[str, str]:
     """Setup Kaggle API, download data, and scrape instructions.
     
     Returns:
@@ -160,31 +163,33 @@ async def setup_kaggle_api(job_id: str, competition_url: str) -> tuple[str, str]
     )
     os.makedirs(data_path, exist_ok=True)
 
-    # Download and unzip competition data if not already present
-    if not os.listdir(data_path):
-        logger.info(f"[{job_id}] Downloading data for '{competition_id}' to {data_path}")
-        try:
-            await asyncio.to_thread(
-                api.competition_download_files, 
-                competition_id, 
-                path=data_path, 
-                quiet=False
-            )
-            logger.info(f"[{job_id}] Kaggle data downloaded successfully.")
+    lock = Lock(redis_client, name=f"lock:competition:{competition_id}", blocking_timeout=30)
+    async with lock:
+        # Download and unzip competition data if not already present
+        if not os.listdir(data_path):
+            logger.info(f"[{job_id}] Downloading data for '{competition_id}' to {data_path}")
+            try:
+                await asyncio.to_thread(
+                    api.competition_download_files, 
+                    competition_id, 
+                    path=data_path, 
+                    quiet=False
+                )
+                logger.info(f"[{job_id}] Kaggle data downloaded successfully.")
 
-            # Unzip the downloaded file
-            for item in os.listdir(data_path):
-                if item.endswith(".zip"):
-                    zip_path = os.path.join(data_path, item)
-                    await async_unzip(zip_path, data_path)
-                    os.remove(zip_path)
-                    logger.info(f"[{job_id}] Unzipped and removed {item}")
+                # Unzip the downloaded file
+                for item in os.listdir(data_path):
+                    if item.endswith(".zip"):
+                        zip_path = os.path.join(data_path, item)
+                        await async_unzip(zip_path, data_path)
+                        os.remove(zip_path)
+                        logger.info(f"[{job_id}] Unzipped and removed {item}")
 
-        except Exception as e:
-            logger.error(f"[{job_id}] Failed to download or unzip Kaggle data: {e}")
-            # Create dummy data for testing
-    else:
-        logger.info(f"[{job_id}] Data for '{competition_id}' already exists at {data_path}. Skipping download.")
+            except Exception as e:
+                logger.error(f"[{job_id}] Failed to download or unzip Kaggle data: {e}")
+                # Create dummy data for testing
+        else:
+            logger.info(f"[{job_id}] Data for '{competition_id}' already exists at {data_path}. Skipping download.")
         
     
     # Scrape competition details

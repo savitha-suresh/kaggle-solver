@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import asyncio
 import sys
 import traceback
+import docker
 
 import redis.asyncio as redis
 from taskiq_redis import RedisAsyncResultBackend, ListQueueBroker
@@ -18,6 +19,7 @@ from app.worker.docker_utils import start_container, get_container_status_and_lo
 from app.kaggle.client import setup_kaggle_api
 from app.utils import sanitize_job_id
 from app.worker.dependencies import get_llm_client, get_redis_client, get_storage_client
+from app.worker.docker_utils import cleanup_container_force, cleanup_container
 from app.llm.base import BaseLLM
 from app.storage.base import BaseStorage
 
@@ -31,8 +33,11 @@ result_backend = RedisAsyncResultBackend(
     redis_url="redis://localhost:6379",
 )
 
+
+# Use rabbitmq for retries on worker crash
 broker = ListQueueBroker(
-    url="redis://localhost:6379",
+    url="redis://localhost:6379"
+
 ).with_result_backend(result_backend)
 
 
@@ -40,7 +45,7 @@ broker = ListQueueBroker(
 
 
 # --- Taskiq Tasks ---
-@broker.task(task_name="process_job_queue")
+@broker.task(task_name="process_job_queue", timeout=settings.task_timeout)
 async def process_job(
     job_id: str,
     redis_client: redis.Redis = TaskiqDepends(get_redis_client),
@@ -62,7 +67,8 @@ async def process_job(
         # 2. Setup directories and Kaggle API
         llm_instructions, data_path = await setup_kaggle_api(
             job_id, 
-            job_data['competition_url']
+            job_data['competition_url'],
+            redis_client
         )
         # 3. Prepare for LLM call (check for previous errors)
         previous_code = None
@@ -97,6 +103,10 @@ async def process_job(
         # 7. Enqueue polling task
         await poll_container_status.kiq(job_id, container_id)
 
+    except asyncio.TimeoutError:
+        tb_str = traceback.format_exc()
+        logger.error(f"[{job_id}] TimeoutError in process_job task.", exc_info=True)
+        await handle_job_failure(job_id, "Job processing timed out.", tb_str, redis_client, is_timeout=True)
     except Exception as e:
         tb_str = traceback.format_exc()
         logger.error(f"[{job_id}] Error in process_job task: {e}", exc_info=True)
@@ -120,8 +130,13 @@ async def poll_container_status(
 
     if status == "running":
         logger.info(f"[{job_id}] Container {container_id} still running. Re-queueing poll task.")
+        container_created_at = datetime.fromisoformat(job_data['created_at'])
+        if datetime.utcnow() - container_created_at > timedelta(seconds=settings.task_timeout):
+            logger.error(f"[{job_id}] Container {container_id} timed out.")
+            await handle_job_failure(job_id, "Container execution timed out.", logs, redis_client, is_timeout=True)
+            return
        
-        # https://github.com/taskiq-python/taskiq/issues/279
+        # https://github.com/taskiq-python/taskiq/issues/279 - delayed queuing workaround
         await asyncio.sleep(settings.poll_delay_seconds)
         await poll_container_status.kiq(job_id, container_id)
         
@@ -147,7 +162,7 @@ async def poll_container_status(
         logger.error(f"[{job_id}] Container {container_id} exited with an error.")
         await handle_job_failure(job_id, "Container execution failed.", logs, redis_client)
 
-async def handle_job_failure(job_id: str, error_message: str, logs: str | None, redis_client: redis.Redis):
+async def handle_job_failure(job_id: str, error_message: str, logs: str | None, redis_client: redis.Redis, is_timeout: bool = False):
     """Handles job failure logic, including retries and status updates."""
     job_data = await redis_client.json().get(job_id)
     if not job_data:
@@ -163,10 +178,12 @@ async def handle_job_failure(job_id: str, error_message: str, logs: str | None, 
         error_entry["logs"] = logs # Store logs only if there was a container error
     await redis_client.json().arrappend(job_id, "$.errors", error_entry)
 
-    if current_attempts + 1 >= max_attempts:
+    if is_timeout or current_attempts + 1 >= max_attempts:
         await redis_client.json().set(job_id, "$.status", "failed")
         await redis_client.json().set(job_id, "$.completed_at", datetime.utcnow().isoformat())
         logger.error(f"[{job_id}] Job failed permanently after {current_attempts + 1} attempts.")
+        if job_data.get("container_id"):
+            await cleanup_container_force(job_id, job_data["container_id"])
     else:
         await redis_client.json().set(job_id, "$.attempts", current_attempts + 1)
         await redis_client.json().set(job_id, "$.status", "pending_retry")

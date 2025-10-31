@@ -79,7 +79,9 @@ async def start_container(job_id: str, code: str, data_dir: str) -> str:
             mounts=[input_mount, working_mount],
             environment={"JOB_ID": job_id},  # Pass job_id as env var
             detach=True,  # Run in detached mode
-            remove=False  # Don't auto-remove so we can get logs
+            remove=False,  # Don't auto-remove so we can get logs
+            nano_cpus=int(settings.docker_cpu_limit) * 10**9,
+            mem_limit=settings.docker_memory_limit
         )
         logger.info(f"[{job_id}] Container {container.id} started successfully.")
         return container.id
@@ -198,6 +200,30 @@ async def cleanup_container(job_id: str, container_id: str, client: docker.Docke
         logger.debug(f"[{job_id}] Container {container_id} already removed")
     except Exception as e:
         logger.warning(f"[{job_id}] Error during container cleanup: {e}")
+
+
+async def cleanup_container_force(job_id: str, container_id: str):
+    """
+    Forcefully stops and removes a container and its image.
+    """
+    client = docker.from_env()
+    try:
+        container = await run_in_executor(client.containers.get, container_id)
+        logger.info(f"[{job_id}] Forcefully stopping and removing container {container_id}.")
+        await run_in_executor(container.remove, force=True)
+        logger.info(f"[{job_id}] Removed container: {container_id}")
+
+        image_tag = _get_image_tag(job_id)
+        try:
+            await run_in_executor(client.images.remove, image_tag, force=True)
+            logger.info(f"[{job_id}] Removed image: {image_tag}")
+        except Exception as e:
+            logger.warning(f"[{job_id}] Could not remove image {image_tag}: {e}")
+
+    except docker.errors.NotFound:
+        logger.warning(f"[{job_id}] Container {container_id} not found for forced cleanup.")
+    except Exception as e:
+        logger.error(f"[{job_id}] Error during forceful container cleanup: {e}", exc_info=True)
 
 
 async def stop_container(job_id: str, container_id: str, timeout: int = 10):
