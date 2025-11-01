@@ -2,6 +2,9 @@
 
 This project provides a robust, scalable system to automatically generate a `submission.csv` file for a Kaggle competition given its URL. The system is designed to be fully autonomous after the initial request.
 
+Loom video demo: [link](https://www.loom.com/share/09cb57e194544025a552c4400f9a0376)
+
+
 ## 1. Problem Overview
 
 The goal is to create a system with a single entrypoint that accepts a Kaggle competition URL. This triggers a complete, unattended pipeline that:
@@ -189,5 +192,3 @@ class StatusResponse(BaseModel):
         ```bash
         python user_run.py <url>
         ```
-
-Loom video demo: [link](https://www.loom.com/share/09cb57e194544025a552c4400f9a0376)
