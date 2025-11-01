@@ -187,8 +187,7 @@ class StatusResponse(BaseModel):
         uvicorn app.main:app --host 0.0.0.0 --port 8000
         ```
 
-4.  **Run:**
-    *   s:
-        ```bash
-        python user_run.py <url>
-        ```
+4.  **Run:** 
+    ```bash
+    python user_run.py <url>
+    ```
