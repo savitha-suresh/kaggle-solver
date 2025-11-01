@@ -5,7 +5,7 @@ from taskiq import Context, TaskiqDepends
 
 from app.logging_config import setup_logging
 from app.storage.base import BaseStorage
-from app.tasks_dag import TASKS_DAG
+from app.tasks_dg import TASKS_DG
 from app.workers.dependencies import get_redis_client, get_storage_client
 from app.workers.broker_config import broker
 from app.workers.worker_manager import get_worker
@@ -54,7 +54,7 @@ async def job_runner(
             f"[{job_id}] Runner {runner_id} started. Enqueuing polling task."
         )
 
-        next_tasks = TASKS_DAG.get(task_name, [])
+        next_tasks = TASKS_DG.get(task_name, [])
         for next_task_name in next_tasks:
             task, worker_data = get_worker(broker, next_task_name)
             if not task or not worker_data:

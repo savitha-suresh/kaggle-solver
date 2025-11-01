@@ -1,4 +1,4 @@
-TASKS_DAG = {
+TASKS_DG = {
     "process_job_queue": ["kaggle_data_loader"],
     "kaggle_data_loader": ["kaggle_scraper"],
     "kaggle_scraper": ["code_generator"],

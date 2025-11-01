@@ -8,7 +8,7 @@ from taskiq import Context, TaskiqDepends
 from app.config import settings
 from app.kaggle.client import download_kaggle_data
 from app.logging_config import setup_logging
-from app.tasks_dag import TASKS_DAG
+from app.tasks_dg import TASKS_DG
 from app.workers.dependencies import get_redis_client, get_kaggle_api
 from kaggle.api.kaggle_api_extended import KaggleApi
 from app.workers.worker_manager import get_worker
@@ -44,7 +44,7 @@ async def kaggle_data_loader(
         await redis_client.json().set(job_id, "$.competition_id", competition_id)
         await redis_client.json().set(job_id, "$.data_path", data_path)
 
-        next_tasks = TASKS_DAG.get(task_name, [])
+        next_tasks = TASKS_DG.get(task_name, [])
         for next_task_name in next_tasks:
             task, worker_data = get_worker(broker, next_task_name)
             if not task or not worker_data:

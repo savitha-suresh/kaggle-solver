@@ -8,7 +8,7 @@ from taskiq import TaskiqDepends, Context
 
 from app.config import settings
 from app.logging_config import setup_logging
-from app.tasks_dag import TASKS_DAG
+from app.tasks_dg import TASKS_DG
 from app.workers.dependencies import get_redis_client
 from app.workers.worker_manager import get_worker
 from app.workers.broker_config import broker
@@ -41,7 +41,7 @@ async def process_job(
     await redis_client.json().set(job_id, "$.current_task", task_name)
 
     try:
-        next_tasks = TASKS_DAG.get(task_name, [])
+        next_tasks = TASKS_DG.get(task_name, [])
         for next_task_name in next_tasks:
             task, worker_data = get_worker(broker, next_task_name)
             if not task or not worker_data:

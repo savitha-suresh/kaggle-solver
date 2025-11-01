@@ -14,9 +14,9 @@ A key requirement is that the system must handle high concurrency, supporting up
 
 ## 2. Final Architecture: REST API + Queue-Based System
 
-We chose a distributed, asynchronous architecture composed of a non-blocking REST API, a message queue, and independent worker processes. This design is inherently scalable, resilient, and well-suited for long-running, resource-intensive tasks.
+I chose a distributed, asynchronous architecture composed of a non-blocking REST API, a message queue, and independent worker processes. This design is inherently scalable, resilient, and well-suited for long-running, resource-intensive tasks.
 
-**[TODO: Insert new architecture diagram here]**
+![Architecture HLD](kaggle_solver.jpg)
 
 ### Components
 
@@ -27,29 +27,29 @@ We chose a distributed, asynchronous architecture composed of a non-blocking RES
         *   Validates the incoming request.
         *   Generates a unique `job_id`.
         *   Creates a job metadata JSON object.
-        *   Enqueues the job by sending it to Redis.
+        *   Enqueues the job.
         *   Immediately returns the `job_id` to the client, allowing the client to poll for results.
         *   Provides another endpoint `/status/<job_id>` for polling.
 
 2.  **Job Queue (Redis & Taskiq):**
-    *   Redis is used as the message broker and result backend.
-    *   Taskiq is used for creating and managing tasks.
+    *   Redis is used as the message broker and result backend because of the low latency and light weight nature.
+    *   Taskiq is used for creating and managing tasks as it supports async by default.
     *   **Responsibilities:**
         *   Acts as a buffer between the web server and the workers, decoupling the two services.
         *   A List holds the queue of `job_id`s waiting to be processed.
         *   A Hash stores the job metadata JSON for each `job_id`, allowing for status tracking.
-        *   Ensures job persistence. If a worker or the entire system restarts, jobs are not lost.
 
-3.  **Worker (Taskiq Worker):**
-    *   A separate process that runs the core logic. It can be scaled horizontally to handle more jobs.
+3.  **Workers (Taskiq Worker):**
+    *   Separate processes that runs the core logic. It can be scaled horizontally to handle more jobs.
     *   **Responsibilities:**
-        *   Pulls a `job_id` from the Redis queue.
-        *   Updates the job status to `processing`.
-        *   Fetches competition data and instructions using the Kaggle API.
-        *   Communicates with an LLM to generate Python code for the model.
-        *   **Crucially, it spawns a Docker container to execute the untrusted code.**
-        *   Monitors the container. On success, it stores the `submission.csv` path and updates the job status to `completed`.
-        *   Implements a retry mechanism. If the code fails, it logs the error, increments an attempt counter, and re-enqueues the job if the maximum number of attempts has not been reached. If it has, the status is set to `failed`.
+        *   Executes tasks in a directed graph (DG) based on the following flow:
+            *   `fast-api`: Initiates the job and adds it to the queue.
+            *   `process_job_queue`: Orchestrates the execution of subsequent tasks.
+            *   `kaggle_data_loader`: Fetches competition data.
+            *   `kaggle_scraper`: Scrapes competition instructions.
+            *   `code_generator`: Generates Python code using an LLM.
+            *   `job_runner`: Executes the generated code in a sandboxed environment (Docker).
+            *   `poll_runner_status`: Monitors the execution status and handles submission or retries.
 
 4.  **Code Execution Environment (Docker):**
     *   Provides a sandboxed environment for running the LLM-generated code.
@@ -59,6 +59,7 @@ We chose a distributed, asynchronous architecture composed of a non-blocking RES
         *   Ensures that the execution environment is clean and reproducible for every job.
 
 ### API Response Structure
+A **status API** was introduced because this task involves long-running jobs, and keeping an HTTP connection open for the entire duration would unnecessarily consume compute resources. Since the requirement was to trigger the process with a single command, a simple `user_run.py` script was created to handle the complete execution flow. This script could also be implemented as a shell script if preferred.
 
 The `/status/{job_id}` endpoint returns a consistent JSON object defined by the `StatusResponse` Pydantic model in `app/schemas/status.py`:
 
@@ -79,7 +80,7 @@ class StatusResponse(BaseModel):
 
 *   **Pros:**
     *   **High Scalability:** The number of workers can be increased or decreased based on the queue size, allowing the system to handle a high volume of requests.
-    *   **Resilience & Fault Tolerance:** The queue ensures that jobs are not lost if a worker crashes. The retry logic handles transient errors in the generated code.
+    *   **Resilience & Fault Tolerance:** The retry logic handles transient errors in the generated code.
     *   **Asynchronous & Non-Blocking:** The API remains responsive to new requests, even when many jobs are being processed. Users get an immediate response and can check the status later.
     *   **Decoupling:** The API, queue, and workers are independent services. They can be developed, deployed, and scaled separately.
     *   **Security:** Running untrusted, LLM-generated code directly on a server is a major security risk. Docker containers provide a strong isolation boundary.
@@ -100,19 +101,64 @@ class StatusResponse(BaseModel):
     *   **HTTP Timeouts:** Kaggle model training can take minutes or hours. This far exceeds standard HTTP timeout limits (e.g., 30-120 seconds), making this approach non-viable.
     *   **No Resilience:** If the script fails for any reason mid-process, the entire job is lost and the user receives an error with no chance for a retry.
 
-### b) Serverless Functions (e.g., AWS Lambda)
+---
 
-*   **Description:** An API Gateway endpoint triggers a serverless function (like AWS Lambda) to perform the job.
+### b) LangChain-based Architecture
+
+*   **Description:** Use LangChain as an orchestration layer for handling task dependencies and managing asynchronous execution across multiple components.  
 *   **Pros:**
-    *   Excellent auto-scaling capabilities.
-    *   Pay-per-use pricing model can be cost-effective.
-    *   Managed infrastructure reduces operational overhead.
+    *   Provides high-level abstractions for chaining tasks and managing context.
+    *   Popular within the LLM ecosystem, with integrations for various data sources and tools.  
 *   **Cons:**
-    *   **Execution Time Limits:** Major cloud providers impose a maximum execution duration (e.g., 15 minutes for AWS Lambda). This is often not long enough for serious model training.
-    *   **State Management:** Long-running workflows would require a more complex setup using a service like AWS Step Functions to orchestrate multiple Lambda calls, significantly increasing complexity.
-    *   **Dependency & Environment Complexity:** Packaging large data science libraries (Pandas, Scikit-learn, PyTorch/TensorFlow) and managing Docker container images for Lambda can be cumbersome.
+    *   **Over-abstracted:** The high level of abstraction limits control and transparency over execution flow, which is critical for debugging and fine-grained scheduling.  
+    *   **Unreliable Async Support:** Asynchronous task execution is poorly supported. The official async utilities have been deprecated. The documentation for the new version (v1.0, released only two weeks ago) is limited. The general feedback from the community is that documentation is inconsistent.  
+    *   **Overkill for the Use Case:** The system’s primary need is efficient async task orchestration, not complex agent or LLM chaining. Hence, LangChain introduces unnecessary complexity and dependency overhead.
 
-## 4. Setup & Usage
+---
+### c) Celery and Other Python Queue Frameworks
+
+*   **Description:** Use task queue frameworks like **Celery** and **Dramatiq** for background task execution.  
+*   **Pros:**
+    *   Mature ecosystems with robust retry and monitoring support.
+    *   Suitable for CPU-bound tasks or synchronous job execution.  
+*   **Cons:**
+    *   **Blocking Worker Model:** Celery workers execute tasks synchronously. To achieve async behavior, each task must spawn its own event loop, which negates the efficiency benefits of async I/O.  
+    *   **Inefficient for High I/O Tasks:** These frameworks are better suited for parallel CPU tasks, not long-lived, high I/O async workloads.
+
+### d) Message Brokers (Kafka, RabbitMQ)
+
+*   **Description:** Use a dedicated message broker to manage job queues and distribute workloads.  
+*   **Pros:**
+    *   Reliable and battle-tested systems for message passing and event-driven architectures.
+    *   Strong delivery guarantees and fault tolerance.  
+*   **Cons:**
+    *   **Operational Overhead:** Requires additional infrastructure and configuration (topics, exchanges, consumer groups, etc.) that are unnecessary for this relatively simple workflow.
+    *   **Overkill for Prototype Scale:** Adds latency and deployment complexity that do not align with the project’s immediate needs.
+
+---
+
+## 4. Future Work and Production Considerations
+
+1. **Extending the LLM Agent/Runner:**  
+   The current LLM agent is used solely for generating code. In production, it should also infer additional metadata such as required dependencies, container CPU and memory limits, and other resource constraints. The current implementation supports only a limited set of libraries.
+
+2. **Data Storage and Caching:**  
+   At present, the local file system is used to store data and instruction files, serving both as cache and intermediate storage as sending large payloads through the task queue is inefficient. A distributed storage solution such as **Amazon S3** or a **Distributed File System** should be adopted. Regular cleanup policies should also be implemented to manage stale data.
+
+3. **Scalability and Workflow Orchestration:**  
+   If the system’s complexity increases, frameworks like **LangChain** may need to be re-evaluated for more advanced orchestration or dynamic task composition.
+
+4. **Persistence and State Management:**  
+   **Redis** is currently used as the broker and temporary store. For reliable persistence, a more durable backend such as **MongoDB** or another persistent datastore should be introduced. Automatic cleanup jobs should be configured to remove outdated keys and logs.
+
+5. **Compute Environment Flexibility:**  
+   The current implementation runs workloads inside **Docker containers**, but it is designed to support any external compute service that can accept jobs and provide status updates. This plug-and-play design allows easy migration to **cloud compute platforms** (such as AWS Batch, Google Cloud Run, or Azure Container Instances) with minimal code changes.
+
+6. **Minor Codebase Cleanup:**  
+   A few small refactoring tasks remain to streamline the codebase, mainly to remove minor redundancies in the code and file handling.
+
+
+## 5. Setup & Usage
 
 1.  **Prerequisites:**
     *   Python 3.9+
@@ -131,15 +177,15 @@ class StatusResponse(BaseModel):
         ```
     *   **Start Worker(s):**
         ```bash
-        taskiq worker app.worker.main:broker
+        taskiq worker app.workers.main:broker
         ```
     *   **Start API Server:**
         ```bash
         uvicorn app.main:app --host 0.0.0.0 --port 8000
         ```
 
-4.  **Run Stress Test:**
-    *   To simulate 50 concurrent users:
+4.  **Run:**
+    *   s:
         ```bash
-        python stresstest.py
+        python user_run.py <url>
         ```

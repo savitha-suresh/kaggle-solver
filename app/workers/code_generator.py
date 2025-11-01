@@ -9,7 +9,7 @@ from app.config import settings
 from app.llm.base import BaseLLM
 from app.logging_config import setup_logging
 from app.storage.base import BaseStorage
-from app.tasks_dag import TASKS_DAG
+from app.tasks_dg import TASKS_DG
 from app.utils.misc import sanitize_job_id, async_read_file
 from app.workers.dependencies import get_llm_client, get_redis_client, get_storage_client
 from app.workers.worker_manager import get_worker
@@ -75,7 +75,7 @@ async def code_generator(
         saved_code_path = await storage.save_file(code_file_path, generated_code)
         await redis_client.json().set(job_id, "$.generated_code_path", saved_code_path)
 
-        next_tasks = TASKS_DAG.get(task_name, [])
+        next_tasks = TASKS_DG.get(task_name, [])
         for next_task_name in next_tasks:
             task, worker_data = get_worker(broker, next_task_name)
             if not task or not worker_data:

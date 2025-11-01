@@ -9,7 +9,7 @@ from taskiq import Context, TaskiqDepends
 from app.config import settings
 from app.logging_config import setup_logging
 from app.storage.base import BaseStorage
-from app.tasks_dag import TASKS_DAG
+from app.tasks_dg import TASKS_DG
 from app.utils.misc import sanitize_job_id, async_read_file
 from app.workers.dependencies import get_redis_client, get_storage_client
 from app.workers.runners.factory import RunnerFactory
