@@ -143,7 +143,7 @@ class StatusResponse(BaseModel):
    The current LLM agent is used solely for generating code. In production, it should also infer additional metadata such as required dependencies, container CPU and memory limits, and other resource constraints. The current implementation supports only a limited set of libraries.
 
 2. **Data Storage and Caching:**  
-   At present, the local file system is used to store data and instruction files, serving both as cache and intermediate storage as sending large payloads through the task queue is inefficient. A distributed storage solution such as **Amazon S3** or a **Distributed File System** should be adopted. Regular cleanup policies should also be implemented to manage stale data.
+   At present, the local file system is used to store data and instruction files, serving both as cache and intermediate storage as sending large payloads through the task queue is inefficient. A distributed storage solution such as **Amazon S3** or a **Distributed File System** should be adopted. Regular cleanup policies should also be implemented to manage stale data. We might also need to compress and store the scrapped data/instructions.
 
 3. **Scalability and Workflow Orchestration:**  
    If the system’s complexity increases, frameworks like **LangChain** may need to be re-evaluated for more advanced orchestration or dynamic task composition.
@@ -189,3 +189,5 @@ class StatusResponse(BaseModel):
         ```bash
         python user_run.py <url>
         ```
+
+Loom video demo: [link](https://www.loom.com/share/09cb57e194544025a552c4400f9a0376)
